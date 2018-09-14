@@ -1,0 +1,500 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>MyMaps</title>
+
+    <script src="~/Scripts/ol.js"></script>
+    <link href="~/Content/ol.css" rel="stylesheet" />
+    <script src="~/Scripts/polyfill.min.js"></script>
+    <script src="~/Scripts/jquery-2.2.3.min.js"></script>
+    <link href="~/Content/bootstrap.css" rel="stylesheet" />
+    <script src="~/Scripts/turf.min.js"></script>
+    <style>
+        #map {
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <div id="map" class="map"></div>
+    <button type="button" id="btnKapiEkle">Kapı Ekle</button>
+    <button type="button" id="btnMahalleEkle">Mahalle Ekle</button>
+    <button type="button" id="btnKaydir">Bırak</button>
+    <button type="button" id="btnDuzenle">Düzenle</button>
+    <form class="form-inline">
+        <label>Geometry type &nbsp;</label>
+        <select id="type">
+            <option value="Point">Point</option>
+            <option value="Polygon">Polygon</option>
+        </select>
+    </form>
+
+    <select id="layer-select">
+        <option value="Aerial">Aerial</option>
+        <option value="AerialWithLabels" selected>Aerial with labels</option>
+        <option value="Road">Road</option>
+        <option value="collinsBart">Collins Bart</option>
+        <option value="ordnanceSurvey">Ordnance Survey</option>
+    </select>
+
+
+    <!-- Modal -->
+    <div class="modal fade" id="myModalNorm" tabindex="-1" role="dialog"
+         aria-labelledby="myModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <!-- Modal Header -->
+                <div class="modal-header">
+                    <button type="button" class="close"
+                            data-dismiss="modal">
+                        <span aria-hidden="true">&times;</span>
+                        <span class="sr-only">Close</span>
+                    </button>
+                    <h4 class="modal-title" id="myModalLabel">
+                        Bilgi Ekranı
+                    </h4>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="modal-body">
+
+                    <form role="form">
+                        <div class="form-group">
+                            <label for="exampleKapiNo">Kapı No</label>
+                            <input type="text" class="form-control"
+                                   id="kapino" placeholder="Kapı Numarasını Giriniz" />
+                        </div>
+                        <div class="form-group">
+                            <label for="exampleMahalleAdi">Mahalle Adı</label>
+                            <input type="text" class="form-control"
+                                   id="mahalleadi" placeholder="Mahalle Adını Giriniz" />
+                        </div>
+                        <div class="form-group">
+                            <label for="exampleKoordinatlar">Koordinatlar</label>
+                            <input type="text" class="form-control"
+                                   id="coordinates" placeholder="" />
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default"
+                            data-dismiss="modal">
+                        İptal
+                    </button>
+                    <button id="btnGonder" type="submit" class="btn btn-primary">
+                        Veri Tabanına Kaydet
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal2 -->
+    <div class="modal fade" id="myModalNorm2" tabindex="-1" role="dialog"
+         aria-labelledby="myModalLabel2" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <!-- Modal2 Header -->
+                <div class="modal-header">
+                    <button type="button" class="close"
+                            data-dismiss="modal">
+                        <span aria-hidden="true">&times;</span>
+                        <span class="sr-only">Close</span>
+                    </button>
+                    <h4 class="modal-title" id="myModalLabel">
+                        Bilgi Ekranı
+                    </h4>
+                </div>
+
+                <!-- Modal2 Body -->
+                <div class="modal-body">
+
+                    <form role="form">
+                        <div class="form-group">
+                            <label for="exampleMahalleAdi2">Mahalle Adı</label>
+                            <input type="text" class="form-control"
+                                   id="mahalleadi2" placeholder="Mahalle Adını Giriniz" />
+                        </div>
+                        <div class="form-group">
+                            <label for="exampleKoordinatlar2">Koordinatlar</label>
+                            <input type="text" class="form-control"
+                                   id="coordinates2" placeholder="" />
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Modal2 Footer -->
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default"
+                            data-dismiss="modal">
+                        İptal
+                    </button>
+                    <button id="btnGonder2" type="submit" class="btn btn-primary">
+                        Veri Tabanına Kaydet
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var modify = null;
+        var vectorLayerSource2 = null;
+        var map = null;
+        var drawKapi = null;
+        var drawMahalle = null;
+        var select = null;
+        var vectorLayerSource = null;
+
+        $('#btnKapiEkle').on('click', function () {
+            try {
+                modify.setActive(false);
+                drawMahalle.setActive(false);
+                drawKapi.setActive(true);
+            } catch (e) {
+
+            }
+        });
+
+        $('#btnMahalleEkle').on('click', function () {
+            try {
+                modify.setActive(false);
+                drawKapi.setActive(false);
+                drawMahalle.setActive(true);
+            } catch (e) {
+
+            }
+        });
+
+        $('#btnKaydir').on('click', function () {
+            try {
+                map.removeInteraction(drawKapi);
+                map.removeInteraction(drawMahalle);
+                //modify.setActive(true);
+                //drawKapi.setActive(true);
+                //drawMahalle.setActive(true);
+            } catch (e) {
+
+            }
+        });
+
+        $(document).ready(function () {
+            var styles = [
+                'Road',
+                'Aerial',
+                'AerialWithLabels',
+                'collinsBart',
+                'ordnanceSurvey'
+            ];
+
+            var layersList = [];
+            var i, ii;
+            for (i = 0, ii = 1; i < ii; ++i) {
+                layersList.push(new ol.layer.Tile({
+                    visible: true,
+                    preload: Infinity,
+                    source: new ol.source.BingMaps({
+                        key: 'AmE6EDrZ-PY7RAn-5Jewb7LcH93kFpg2QdrLTELRhO17MAvR4rSbG18MQMy83jdN',
+                        imagerySet: styles[i],
+                        maxZoom: 19
+                    })
+                }));
+            }
+            //debugger;
+          
+            function veriGetir() {
+                var geojsonObject = {
+                    'features': [{
+                        'type': 'Feature',
+                        'properties': { 'name': 'EPSG:3857' }
+
+                    },
+                    {
+                        'type': 'Feature',
+                        'geometry': {
+                            'type': 'Polygon',
+                            'coordinates': ['wktRepresenation2']
+                        }
+                    },
+                    {
+                        'type': 'Feature',
+                        'geometry': {
+                            'type': 'Point',
+                            'coordinates': ['wktRepresenation']
+                        }
+                    }]
+                }
+                 vectorLayerSource = new ol.source.Vector({
+                    features: (new ol.format.GeoJSON()).readFeatures(geojsonObject)
+                });
+
+                var vectorLayer = new ol.layer.Vector({
+                    name: 'Kapi',
+                    source: vectorLayerSource
+                });
+                layersList.push(vectorLayer);
+
+                vectorLayerSource2 = new ol.source.Vector({
+                    features: (new ol.format.GeoJSON()).readFeatures(geojsonObject)
+                });
+
+                var vectorLayer2 = new ol.layer.Vector({
+                    name: 'Mahalle',
+                    source: vectorLayerSource2
+                });
+                layersList.push(vectorLayer2);
+            }
+            veriGetir();
+            var ffArr = [];
+            window.onload = onyukleme();
+            function onyukleme() {
+                $.ajax({
+                    url: '/Mahalle/TumMahalleleriGetir',
+                    type: 'GET',
+                    dataType: 'json',
+                    contentType: 'application/json; charset=utf-8',
+                    //async: false,
+                    success: function (data) {
+                        //debugger;
+
+
+                        if (data.result == true) {
+                            var wktformat = new ol.format.WKT();
+                            $.each(data.data, function (a, b) {
+                                try {
+                                    var x = wktformat.readFeature(b.Coordinates);
+                                    x.set('MahalleId', b.Id);
+                                    x.set('MahalleAdi', b.StreetName);
+                                    ffArr.push(x);
+
+                                    vectorLayerSource2.addFeature(x);
+                                } catch (e) {
+
+                                }
+                            });
+                        }
+                        else {
+                            alert("Veriler Çekilirken Hata Oluştu");
+                        }
+                    },
+                });
+                $.ajax({
+                    url: '/Door/TumKapilariGetir',
+                    type: 'GET',
+                    dataType: 'json',
+                    contentType: 'application/json; charset=utf-8',
+                    success: function (data) {
+                        //debugger;
+                        if (data.result == true) {
+                            var wktformat1 = new ol.format.WKT();
+                            $.each(data.data, function (a, b) {
+                                try {
+                                    var y = wktformat1.readFeature(b.Coordinates);
+                                    y.set('KapiId', b.Id);
+                                    y.set('KapiNo', b.DoorNo);
+                                    y.set('AitMahalle', b.StreetId);
+                                    vectorLayerSource.addFeature(y);
+
+                                } catch (e) {
+
+                                }
+                            });
+                        }
+                        else {
+                            alert("Veriler Çekilirken Hata Oluştu");
+                        }
+                    },
+
+                });
+            }
+
+
+            map = new ol.Map({
+                layers: layersList,
+                loadTilesWhileInteracting: true,
+                target: 'map',
+                view: new ol.View({
+                    projection: 'EPSG:3857',
+                    center: [3502650.38414, 4788828.282644],
+                    zoom: 6
+                })
+            });
+
+            drawMahalle = new ol.interaction.Draw({
+                source: vectorLayerSource2,
+                type: "Polygon"
+            });
+            map.addInteraction(drawMahalle);
+            drawMahalle.setActive(false);
+
+            drawKapi = new ol.interaction.Draw({
+                source: vectorLayerSource,
+                type: "Point"
+            });
+            map.addInteraction(drawKapi);
+            drawKapi.setActive(false);
+
+
+
+            drawKapi.on('drawend', function (e) {
+                var format = new ol.format.WKT();
+                var wktRepresenation = format.writeGeometry(e.feature.getGeometry());
+                var mahalleler = vectorLayerSource2.getFeatures();
+
+                var point = turf.point(e.feature.getGeometry().getCoordinates());
+
+                if (mahalleler.length > 0) {
+                    for (var i = 0; i < mahalleler.length; i++) {
+                        var mahalle = mahalleler[i];
+
+                        var mahalleWkt = format.writeGeometry(mahalle.getGeometry());
+                        var polygon = turf.polygon(mahalle.getGeometry().getCoordinates());
+                        var intersects = turf.intersect(polygon, point);
+                        if (intersects) {
+                            $('#myModalNorm').modal();
+                            $('#coordinates').val(wktRepresenation);
+                            $('#mahalleadi').val(mahalle.get('MahalleAdi'));
+                        }
+                        else {
+                            alert("Mahalle olmadan kapı eklemesi yapamazsınız.");
+                        }
+                    }
+                }
+            });
+
+            drawMahalle.on('drawend', function (e) {
+                //debugger;
+                var format = new ol.format.WKT();
+                var wktRepresenation2 = format.writeGeometry(e.feature.getGeometry());
+                var mahalleler2 = vectorLayerSource2.getFeatures();
+
+                var polygon1 = turf.polygon(e.feature.getGeometry().getCoordinates());
+                if (mahalleler2.length > 0) {
+                    for (var i = 0; i < mahalleler2.length; i++) {
+                        var mahalle2 = mahalleler2[i];
+
+                        var mahalleWkt = format.writeGeometry(mahalle2.getGeometry());
+                        var polygon2 = turf.polygon(mahalle2.getGeometry().getCoordinates());
+
+                        var intersects = turf.intersect(polygon2, polygon1);
+
+                        if (intersects) {
+                            alert("Mahalleler kesişiyor");
+                            break;
+                        }
+                        else {
+                            $('#myModalNorm2').modal();
+                            $('#coordinates2').val(wktRepresenation2);
+                        }
+                    }
+                }
+            });
+            debugger;
+            select = new ol.interaction.Select({
+                features: ffArr,
+            });
+            map.addInteraction(select);
+
+            modify = new ol.interaction.Modify({
+                features: select.getFeatures()
+
+            });
+            map.addInteraction(modify);
+
+
+            modify.on('modifyend', function (e) {
+                $("#btnDuzenle").click(function () {
+                    var Strett = {
+                        StreetName: $('#mahalleadi2').val(),
+                        Coordinates: $('#coordinates2').val()
+                    }
+
+                    $.ajax({
+                        type: "POST",
+                        url: '/Mahalle/MahalleBilgisiGuncelle',
+                        data: JSON.stringify(Strett),
+                        success: function (data) {
+                            var format = new ol.format.WKT();
+                            var newWktRepresenation = format.writeGeometry(e.feature.getGeometry());
+                            var mahalleDegisim = vectorLayerSource2.getFeatures();
+                            for (var i = 0; i < mahalleDegisim.length; i++) {
+                                mahalleDegisim[i].getGeometry().getCoordinates();
+                                $('#myModalNorm2').modal();
+                                $('#coordinates2').val(newWktRepresenation);
+                            }
+                        },
+                        error: function (err) {
+                            alert("Bir Hata Oluştu");
+                        },
+                        contentType: 'application/json; charset=utf-8'
+                    });
+                    //    debugger;
+                    //    var format = new ol.format.WKT();
+                    //    var newWktRepresenation = format.writeGeometry(e.features);
+                    //    var mahalleDegisim = vectorLayerSource2.getFeatures();
+                    //    for (var i = 0; i < mahalleDegisim.length; i++) {
+                    //        mahalleDegisim[i].getGeometry().getCoordinates();
+                    //        $('#myModalNorm2').modal();
+                    //        $('#coordinates2').val(newWktRepresenation);
+                    //    }
+                });
+
+            });
+
+
+            $("#btnGonder").click(function () {
+
+                var Door = {
+                    DoorNo: $('#kapino').val(),
+                    Coordinates: $('#coordinates').val(),
+                    StreetId: $('#mahalleadi').val()
+                }
+
+                $.ajax({
+                    type: "POST",
+                    url: '/Door/KapiBilgisiGonder',
+                    data: JSON.stringify(Door),
+                    success: function (data) {
+                        alert(data);
+                        alert("Kayıt İşlemi Başarılı");
+                    },
+                    error: function (err) {
+                        alert("Bir Hata Oluştu");
+                    },
+                    contentType: 'application/json; charset=utf-8'
+                });
+            });
+
+            $("#btnGonder2").click(function () {
+
+                var Strett = {
+                    StreetName: $('#mahalleadi2').val(),
+                    Coordinates: $('#coordinates2').val()
+                }
+
+                $.ajax({
+                    type: "POST",
+                    url: '/Mahalle/MahalleBilgisiGonder',
+                    data: JSON.stringify(Strett),
+                    success: function (data) {
+                        alert(data);
+                        alert("Kayıt İşlemi Başarılı");
+                    },
+                    error: function (err) {
+                        alert("Bir Hata Oluştu");
+                    },
+                    contentType: 'application/json; charset=utf-8'
+                });
+            });
+
+            //$(".close").click(function () {
+            //    vectorLayerSource2.clear();
+            //    vectorLayerSource.clear();
+            //    veriGetir();
+            //    });
+        });
+    </script>
+</body>
+</html>
